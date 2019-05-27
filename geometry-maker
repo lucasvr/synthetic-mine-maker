@@ -1,0 +1,167 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+# Synthetic mine generator
+
+import os
+import sys
+import glob
+import getopt
+import random
+from src.map import MapGen
+from src.output import PostGIS
+import src.randomvariategen as rvg
+from configparser import ConfigParser
+
+
+class OptionParser:
+    def __init__(self):
+        self.shortopts = "hc:o:"
+        self.longopts = ["config-file=", "help", "output-dir="]
+        self.config_file = "config.ini"
+        self.output_dir = "output"
+
+    def usage(self, retval):
+        print("Syntax: {} <options>\n\n"\
+              "Available options are:\n"\
+              "  -h, --help               This help\n"\
+              "  -c, --config-file=FILE   Config file (default: {})\n"\
+              "  -o, --output-dir=DIR     Output directory (default: {})\n"
+              .format(sys.argv[0], self.config_file, self.output_dir))
+        sys.exit(retval)
+
+    def parse(self):
+        try:
+            options, _ = getopt.getopt(
+                            sys.argv[1:],
+                            self.shortopts,
+                            self.longopts)
+        except getopt.GetoptError as e:
+            print("{}: {}".format(sys.argv[0], str(e)))
+            self.usage(1)
+        for opt, arg in options:
+            if opt in [ "-c", "--config-file" ]:
+                print("Reading settings from {}".format(arg))
+                self.config_file = arg
+            elif opt in [ "-h", "--help" ]:
+                self.usage(0)
+            elif opt in [ "-o", "--output" ]:
+                self.output_dir = arg
+            else:
+                print("invalid option %s" %opt)
+                self.usage(1)
+        return self
+
+
+def genDistribution(min_val, max_val, num_floors):
+    num_objects = int(random.uniform(min_val, max_val))
+    excess = num_floors - num_objects
+    if excess > 0:
+        num_objects += excess
+    buckets = sorted(random.sample(range(1, num_objects), num_floors-1))
+    output = [a-b for a, b in zip(buckets+[num_objects], [0]+buckets)]
+    if excess > 0:
+        num_objects -= excess
+        while excess > 0:
+            for i,count in enumerate(output):
+                if count > 0 and excess > 0:
+                    output[i] -= 1
+                    excess -= 1
+    return output
+
+def read_file(path):
+    data = []
+    with open(path, 'r') as f:
+        data = [float(v[:-1]) for v in f.readlines()]
+    return data
+
+def main():
+    # Parse command-line arguments, if given
+    options = OptionParser().parse()
+
+    # Read settings from the config file
+    cfg = ConfigParser()
+    with open(options.config_file, "r") as f:
+        cfg.read_file(f)
+
+    # Prepare output directory
+    if not os.path.exists(options.output_dir):
+        os.makedirs(options.output_dir)
+    else:
+        for fname in glob.glob("{}/*.dump".format(options.output_dir)):
+            os.unlink(fname)
+
+    # Create a random number of floors
+    num_floors = int(random.uniform(
+        int(cfg.get("Floor", "min")),
+        int(cfg.get("Floor", "max"))))
+
+    # Geological shapes can span several floors, so we choose only a few
+    # floors from where the shapes will grow.
+    # We also handle the possible situation in which we have more samples
+    # (num_floors) than population (num_shapes).
+    shapes = genDistribution(
+        int(cfg.get("GeologicalShapes", "min")),
+        int(cfg.get("GeologicalShapes", "max")),
+        num_floors)
+
+    # Obtain probabilities distributions for geological shapens in dimensions
+    # x, y, and z
+    x_dist_name = cfg.get("GeologicalShapes", "x_size_pname")
+    x_dist_params = cfg.get("GeologicalShapes", "x_size_pparams")
+    x_dist_params = [float(v) for v in x_dist_params[1:-1].split(',')]
+    x_size_gen = rvg.TheoreticalDistribution(x_dist_name, x_dist_params)
+
+    y_dist_name = cfg.get("GeologicalShapes", "y_size_pname")
+    y_dist_params = cfg.get("GeologicalShapes", "y_size_pparams")
+    y_dist_params = [float(v) for v in y_dist_params[1:-1].split(',')]
+    y_size_gen = rvg.TheoreticalDistribution(y_dist_name, y_dist_params)
+
+    z_dist_name = cfg.get("GeologicalShapes", "z_size_pname")
+    z_dist_params = cfg.get("GeologicalShapes", "z_size_pparams")
+    z_dist_params = [float(v) for v in z_dist_params[1:-1].split(',')]
+    z_size_gen = rvg.TheoreticalDistribution(z_dist_name, z_dist_params)
+
+    geo_size_gens = [x_size_gen, y_size_gen, z_size_gen]
+
+    # Determine how many drill holes to create on each floor
+    drillholes = genDistribution(
+        int(cfg.get("DrillHoles", "min")),
+        int(cfg.get("DrillHoles", "max")),
+        num_floors)
+
+    file_path = cfg.get("DrillHoles", "sizes_file")
+    data = read_file(file_path)
+    drill_size_gen = rvg.EmpiricalDistribution(data)
+
+    print("Floors: {}".format(num_floors))
+    print("Shapes: {}, distribution: {}".format(sum(shapes), shapes))
+    print("Drills: {}, distribution: {}".format(sum(drillholes), drillholes))
+
+    num_blocks = 0
+    for i in range(num_floors):
+        floor = MapGen(
+            drill_size_gen,
+            geo_size_gens,
+            cols = int(cfg.get("Floor", "grid_cols")),
+            rows = int(cfg.get("Floor", "grid_rows")),
+            min_seeds  = int(cfg.get("Floor", "min_seeds")),
+            max_seeds  = int(cfg.get("Floor", "max_seeds")),
+            cell_height = int(cfg.get("Floor", "cell_height")),
+            cell_width  = int(cfg.get("Floor", "cell_width")),
+            num_drills = drillholes[i],
+            drill_ival_length = int(cfg.get("DrillHoles", "interval_length")),
+            num_shapes = shapes[i]
+        )
+        floor.create(i)
+        num_blocks += sum([len(shp.block_indexes) for shp in floor.shapes])
+
+        # Export results
+        postgis_fmt = PostGIS()
+        postgis_fmt.write(i, floor, options.output_dir)
+
+    print("Blocks: {}".format(num_blocks))
+
+
+if __name__ == "__main__":
+    main()
