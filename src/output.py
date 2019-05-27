@@ -37,7 +37,10 @@ class PostGIS:
         f.write(f"INSERT INTO {table}(geom) VALUES\n")
         return f
 
-    def __close(self, f):
+    def __close(self, table, f):
+        idx = "{}_geom_idx".format(table.split(".")[1])
+        f.write(";\n")
+        f.write(f"CREATE INDEX IF NOT EXISTS {idx} ON {table} using GIST(geom)")
         f.write(";\n")
         f.close()
 
@@ -51,7 +54,7 @@ class PostGIS:
             terminator = "," if i < len(the_map.corridor)-1 else ""
             f.write("{}{}\n".format(cell.coords(), terminator))
         f.write(")')")
-        self.__close(f)
+        self.__close(table, f)
 
     def writeDrillHoles(self, the_map, table, path):
         """
@@ -61,7 +64,7 @@ class PostGIS:
         for i, drill in enumerate(the_map.drills):
             terminator = "," if i < len(the_map.drills)-1 else ""
             f.write("('{}'){}\n".format(drill.geom(), terminator))
-        self.__close(f)
+        self.__close(table, f)
 
     def writeMultiLineDrillHoles(self, the_map, table, path):
         """
@@ -76,7 +79,7 @@ class PostGIS:
             coords = drill.geom().replace("LINESTRINGZ", "")
             f.write("{}{}\n".format(coords, terminator))
         f.write(")')")
-        self.__close(f)
+        self.__close(table, f)
 
     def writeSegments(self, the_map, table, path):
         """
@@ -89,7 +92,7 @@ class PostGIS:
                 last = i == len(the_map.drills)-1 and j == len(segments)-1
                 terminator = "," if not last else ""
                 f.write("('{}'){}\n".format(segment.geom(), terminator))
-        self.__close(f)
+        self.__close(table, f)
 
     def writeGeologicalShapes(self, the_map, table, path):
         """
@@ -99,7 +102,7 @@ class PostGIS:
         for i, shape in enumerate(the_map.shapes):
             terminator = "," if i < len(the_map.shapes)-1 else ""
             f.write("('{}'){}\n".format(shape.geom(), terminator))
-        self.__close(f)
+        self.__close(table, f)
 
     def writeBlockModel(self, the_map, table, path):
         """
@@ -109,4 +112,4 @@ class PostGIS:
         for i, shape in enumerate(the_map.shapes):
             terminator = "," if i < len(the_map.shapes)-1 else ""
             f.write("{}{}\n".format(shape.blockmodelGeom(), terminator))
-        self.__close(f)
+        self.__close(table, f)
