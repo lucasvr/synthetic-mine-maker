@@ -138,22 +138,29 @@ def main():
     print("Shapes: {}, distribution: {}".format(sum(shapes), shapes))
     print("Drills: {}, distribution: {}".format(sum(drillholes), drillholes))
 
+    # Determine an initial seed which is where all floors will connect.
+    # This is to mimic the existence of an elevator.
+    grid_cols = int(cfg.get("Floor", "grid_cols"))
+    grid_rows = int(cfg.get("Floor", "grid_rows"))
+    elevator = (random.randint(0, grid_cols-1), random.randint(0, grid_rows-1))
+
     num_blocks = 0
     for i in range(num_floors):
         floor = MapGen(
             drill_size_gen,
             geo_size_gens,
-            cols = int(cfg.get("Floor", "grid_cols")),
-            rows = int(cfg.get("Floor", "grid_rows")),
+            cols = grid_cols,
+            rows = grid_rows,
             min_seeds  = int(cfg.get("Floor", "min_seeds")),
             max_seeds  = int(cfg.get("Floor", "max_seeds")),
             cell_height = int(cfg.get("Floor", "cell_height")),
             cell_width  = int(cfg.get("Floor", "cell_width")),
+            elevator_coords = elevator,
             num_drills = drillholes[i],
             drill_ival_length = int(cfg.get("DrillHoles", "interval_length")),
             num_shapes = shapes[i]
         )
-        floor.create(i)
+        floor.create(i, num_floors)
         num_blocks += sum([len(shp.block_indexes) for shp in floor.shapes])
 
         # Export results

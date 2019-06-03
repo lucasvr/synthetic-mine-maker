@@ -55,6 +55,11 @@ class PostGIS:
             terminator = "," if i < len(the_map.corridor)-1 else ""
             f.write("{}{}\n".format(cell.coords(), terminator))
         f.write(")')")
+        if the_map.elevator is not None:
+            f.write(",\n")
+            f.write("('POLYHEDRALSURFACEZ(\n")
+            f.write("{}\n".format(the_map.elevator.coords()))
+            f.write(")')")
         self.__close(table, f)
 
     def writeDrillHoles(self, the_map, table, path):

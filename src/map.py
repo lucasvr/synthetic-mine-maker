@@ -72,6 +72,7 @@ class MapGen:
     def __init__(self, size_generator, shape_size_generators, 
                  cols=100,
                  rows=45, min_seeds=10, max_seeds=20,
+                 elevator_coords=(0, 0),
                  num_drills=100,
                  cell_height=3, cell_width=4,
                  drill_ival_length=10,
@@ -81,6 +82,7 @@ class MapGen:
         self.drill_interval_length = drill_ival_length
         self.map = np.empty((cols, rows), dtype=object)
         self.num_rooms = random.randint(min_seeds, max_seeds)
+        self.elevator_coords = elevator_coords
         self.num_drills = num_drills
         self.num_shapes = num_shapes
         self.cell_height = cell_height
@@ -91,6 +93,7 @@ class MapGen:
         self.corridor = []
         self.drills = []
         self.shapes = []
+        self.elevator = None
 
     def __str__(self):
         drill_locations = {}
@@ -120,7 +123,7 @@ class MapGen:
     def repr(self):
         return self.__str__()
 
-    def create(self, level):
+    def create(self, level, num_levels):
         """
         This function does the bulk of the synthetic dataset generation
         processing. It begins by creating the endpoints (or "rooms" in
@@ -132,6 +135,8 @@ class MapGen:
         """
         print("Processing level {}".format(level))
         self.__createCorridors(level)
+        if level > 0 and level == num_levels-1:
+            self.__createElevator(num_levels)
         self.__createDrillholes()
 
         # Pick the endpoint of some random drillholes as seeds for the
@@ -154,9 +159,9 @@ class MapGen:
                 self.map[col,row] = None
 
         # Create the endpoints
-        endpoints = [
+        endpoints = [self.elevator_coords] + [
             (random.randint(0, self.cols-1), random.randint(0, self.rows-1))
-            for x in range(self.num_rooms)]
+            for x in range(self.num_rooms-1)]
         for col, row in endpoints:
             self.map[col,row] = MineWorkingCell(
                 col, row, self.cell_height, self.cell_width,
@@ -194,6 +199,17 @@ class MapGen:
                         if self.map[ncol, nrow] != None:
                             neighbors.append((ncol, nrow))
                     cell.setNeighbors(neighbors)
+
+    def __createElevator(self, num_levels):
+        col, row = self.elevator_coords
+        padding = -25
+        self.elevator = MineWorkingCell(
+            col, row,
+            self.cell_height * (num_levels-1) * padding,
+            self.cell_width,
+            level=0,
+            padding=1,
+            cell_type=MineWorkingCell.CORRIDOR)
 
     def __createDrillholes(self):
         # Distribute drill holes on corridor cells, populating the
