@@ -91,7 +91,7 @@ class MineWorkingCell:
     def __init__(self,
         col, row,
         height, width,
-        level=0, padding=5,
+        level=0, padding=25,
         cell_type=EMPTY):
 
         self.col = col
