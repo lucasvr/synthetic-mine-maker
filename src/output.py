@@ -38,10 +38,11 @@ class PostGIS:
         return f
 
     def __close(self, table, f):
-        idx = "{}_geom_idx".format(table.split(".")[1])
+        id_idx = "{}_id_idx".format(table.split(".")[1])
+        geom_idx = "{}_geom_idx".format(table.split(".")[1])
         f.write(";\n")
-        f.write(f"CREATE INDEX IF NOT EXISTS {idx} ON {table} using GIST(geom)")
-        f.write(";\n")
+        f.write(f"CREATE INDEX IF NOT EXISTS {id_idx} ON {table}(id);\n")
+        f.write(f"CREATE INDEX IF NOT EXISTS {geom_idx} ON {table} using GIST(geom);\n")
         f.close()
 
     def writeMineWorking(self, the_map, table, path):
