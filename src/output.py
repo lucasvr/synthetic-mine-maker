@@ -25,7 +25,7 @@ class PostGIS:
         ])
         for table in functions.keys():
             print("Exporting results: level {}, table {}".format(level, table))
-            fname = "{}.level_{:02d}.dump".format(table, level)
+            fname = "{}.level_{:02d}.sql".format(table, level)
             path = os.path.join(output_dir, fname)
             functions[table](the_map, f"{self.schema}.{table}", path)
 
@@ -42,7 +42,7 @@ class PostGIS:
         geom_idx = "{}_geom_idx".format(table.split(".")[1])
         f.write(";\n")
         f.write(f"CREATE INDEX IF NOT EXISTS {id_idx} ON {table}(id);\n")
-        f.write(f"CREATE INDEX IF NOT EXISTS {geom_idx} ON {table} using GIST(geom);\n")
+        f.write(f"CREATE INDEX IF NOT EXISTS {geom_idx} ON {table} USING GIST(geom);\n")
         f.close()
 
     def writeMineWorking(self, the_map, table, path):

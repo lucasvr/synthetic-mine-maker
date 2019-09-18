@@ -88,7 +88,7 @@ def main():
     if not os.path.exists(options.output_dir):
         os.makedirs(options.output_dir)
     else:
-        for fname in glob.glob("{}/*.dump".format(options.output_dir)):
+        for fname in glob.glob("{}/*.sql".format(options.output_dir)):
             os.unlink(fname)
 
     # Create a random number of floors
