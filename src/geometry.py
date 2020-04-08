@@ -68,15 +68,15 @@ class Point:
         return "{} {}".format(self.x, self.y)
 
     def wkt(self):
-        if self.z is not None:
-            return "POINTZ ({})".format(self.coords())
-        return "POINT ({})".format(self.coords())
+        datatype = "POINTZ" if self.z is not None else "POINT"
+        return "{} ({})".format(datatype, self.coords())
 
 
 class Line:
     def __init__(self, p1, p2):
         self.p1 = p1
         self.p2 = p2
+        self.is_2d = self.p1.z == None
 
     def setLength(self, new_length):
         x, y, z = self.__translatedCoords()
@@ -85,7 +85,7 @@ class Line:
             cur_length = 1.0
         self.p2.x = self.p1.x + (x / cur_length) * new_length
         self.p2.y = self.p1.y + (y / cur_length) * new_length
-        if self.p1.z is not None:
+        if not self.is_2d:
             self.p2.z = self.p1.z + (z / cur_length) * new_length
 
     def rotate(self, x_angle=None, y_angle=None, z_angle=None):
@@ -106,7 +106,7 @@ class Line:
             self.p2.y = self.p1.y + (x*sin(z_angle) - y*cos(z_angle))
 
     def __translatedCoords(self):
-        if self.p1.z is not None:
+        if not self.is_2d:
             return (
                 self.p2.x - self.p1.x,
                 self.p2.y - self.p1.y,
@@ -122,9 +122,8 @@ class Line:
         return "{}, {}".format(self.p1.coords(), self.p2.coords())
 
     def wkt(self):
-        if self.p1.z is not None:
-            return "LINESTRINGZ ({})".format(self.coords())
-        return "LINESTRING ({})".format(self.coords())
+        datatype = "LINESTRING" if self.is_2d else "LINESTRINGZ"
+        return "{} ({})".format(datatype, self.coords())
 
 
 class Triangle:
@@ -172,10 +171,15 @@ class Triangle:
             v = self.p2 - self.p1
             w = self.p3 - self.p1
             # Compute the cross product
-            nx = (v.y * w.z) - (w.y * v.z)
-            ny = (v.z * w.x) - (w.z * v.x)
-            nz = (v.x * w.y) - (w.x * v.y)
-            self.normal = Point(nx, ny, nz)
+            if self.p1.z is not None:
+                nx = (v.y * w.z) - (w.y * v.z)
+                ny = (v.z * w.x) - (w.z * v.x)
+                nz = (v.x * w.y) - (w.x * v.y)
+                self.normal = Point(nx, ny, nz)
+            else:
+                # TODO
+                nx = (v.x * w.y) - (v.y * w.x)
+                self.normal = Point(nx, ny, None)
         return self.normal
 
     def getRandomPoint(self):
@@ -203,7 +207,8 @@ class Triangle:
             self.p1.coords())
 
     def wkt(self):
-        return "POLYGONZ ({})".format(self.coords())
+        fmt = "POLYGON" if self.p1.z is None else "POLYGONZ"
+        return "{} ({})".format(fmt,self.coords())
 
 
 class Tetrahedron:

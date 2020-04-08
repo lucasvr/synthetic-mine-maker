@@ -153,7 +153,7 @@ class MineWorkingCell:
             [0, 1, 7, 4, 0],
             [2, 3, 5, 6, 2]
         ]
-        fmt = "POLYHEDRALSURFACEZ(" if z is not None else "POLYHEDRALSURFACE("
+        fmt = "POLYHEDRALSURFACE(" if z is None else "POLYHEDRALSURFACEZ("
         for i, face in enumerate(order):
             terminator = "," if i < len(order)-1 else ""
             fmt += "(("
@@ -322,6 +322,7 @@ class MineWorkingCell:
                 # We have a wall here
                 t1, t2 = self.getWall(orientation)
                 t = random.choice([t1, t2])
+                # TODO: support 2D. Must return points with z=None
                 return t.getRandomPoint(), t.computeNormal()
 
         # Surrounding cells are either at the boundary
@@ -331,7 +332,10 @@ class MineWorkingCell:
 
 class GeologicalShape:
     def __init__(self, xsize, ysize, zsize, max_blocks):
-        self.map = np.empty((xsize, ysize, zsize), dtype=bool)
+        if zsize == None:
+            self.map = np.empty((xsize, ysize), dtype=bool)
+        else:
+            self.map = np.empty((xsize, ysize, zsize), dtype=bool)
         self.xsize = xsize
         self.ysize = ysize
         self.zsize = zsize
@@ -342,7 +346,8 @@ class GeologicalShape:
 
     def __str__(self):
         grid = ""
-        for k in range(self.zsize):
+        nfloors = self.zsize if self.zsize is not None else 1
+        for k in range(nfloors):
             grid += "---- level {} ----\n".format(k)
             for i in range(self.xsize):
                 for j in range(self.ysize):
@@ -378,17 +383,69 @@ class GeologicalShape:
         """
         # Adjust the seed point so that the shape grows above and
         # below this level's corridor cells
-        self.seed = Point(seed.x, seed.y, seed.z + (self.zsize/2.0) * self.cube_size)
+        num_floors = self.zsize if self.zsize != None else 0
+        self.seed = Point(seed.x, seed.y, seed.z + (num_floors/2.0) * self.cube_size)
 
         # Create the shape as a collection of regular boxes
-        vertices = self.__createGeometry()
+        num_floors = 3 if self.zsize is not None else 2
+        if num_floors == 2:
+            vertices = self.__createGeometry2D()
+        else:
+            vertices = self.__createGeometry3D()
 
         # Compute the convex hull of the shape
-        self.hull = ConvexHull(vertices)
-        self.delaunay = Delaunay(self.hull.points)
+        if len(vertices):
+            self.hull = ConvexHull(vertices)
+            self.delaunay = Delaunay(self.hull.points)
 
-    def __createGeometry(self):
-        # Initialize the grid
+    def __createGeometry2D(self):
+        # Initialize the 2D grid
+        for i in range(0, self.map.shape[0], self.cube_size):
+            for j in range(0, self.map.shape[1], self.cube_size):
+                self.map[i,j] = False
+
+        random_ysize = random.randrange(self.map.shape[1])
+
+        # Define the shape cells
+        max_blocks = self.max_blocks
+        for i in range(0, self.xsize, self.cube_size):
+            y_min = random.randrange(random_ysize + 1)
+            y_rand = random.randrange(random_ysize + 1, self.ysize + 1)
+            y_max = self.ysize if random_ysize == self.ysize else y_rand
+
+            for j in range(y_min, y_max, self.cube_size):
+                # We want to have a mineworking cell here
+                self.block_indexes.append((i,j))
+                self.map[i,j] = True
+                max_blocks -= 1
+            if max_blocks <= 0:
+                break
+
+        # Tell each cell who its neighbors are
+        vertices_dict = OrderedDict()
+
+        # TODO: add proper support for 2D
+        #for i, j in self.block_indexes:
+        #    neighbors = []
+        #    for (ni, nj, _) in self.possibleNeighbors(i, j, None):
+        #        if self.map[ni, nj]:
+        #            neighbors.append((ni, nj))
+        #    if len(neighbors) > 0:
+        #        cell = MineWorkingCell(
+        #            i, j,
+        #            self.cube_size, self.cube_size,
+        #            level=0,
+        #            padding=1,
+        #            cell_type=MineWorkingCell.BLOCK)
+        #        cell.translate(self.seed)
+        #        cell.setNeighbors(neighbors)
+        #        cell.getVerticeData(vertices_dict)
+
+        # Return the list of vertices that compose this shape
+        return list(vertices_dict.values())
+
+    def __createGeometry3D(self):
+        # Initialize the 3D grid
         for k in range(0, self.map.shape[2], self.cube_size):
             for i in range(0, self.map.shape[0], self.cube_size):
                 for j in range(0, self.map.shape[1], self.cube_size):
@@ -442,23 +499,32 @@ class GeologicalShape:
         """
         WKT representation of this geometry.
         """
-        fmt = "POLYHEDRALSURFACEZ(\n"
-        for index in self.delaunay.simplices:
-            fmt += "(("
-            for p in self.hull.points[index][0:3]:
-                fmt += "{} {} {},".format(p[0], p[1], p[2])
-            # Repeat the first point
-            p = self.hull.points[index][0]
-            fmt += "{} {} {}".format(p[0], p[1], p[2])
-            fmt += ")),\n"
+        num_floors = 2 if self.zsize is None else 3
+
+        # TODO: add proper support for 2D
+        fmt = "POLYHEDRALSURFACEZ(\n" if num_floors == 3 else "POLYHEDRALSURFACE(\n"
+        if self.delaunay:
+            for index in self.delaunay.simplices:
+                fmt += "(("
+                for p in self.hull.points[index][0:3]:
+                    fmt += "{} {} {},".format(p[0], p[1], p[2])
+                # Repeat the first point
+                p = self.hull.points[index][0]
+                fmt += "{} {} {}".format(p[0], p[1], p[2])
+                fmt += ")),\n"
         return fmt[:-2] + "\n)"
 
     def blockmodelGeom(self):
         """
         List of WKT strings representing all blockmodels within this geometry.
         """
+        num_floors = 2 if self.zsize is None else 3
         fmt = ""
-        for idx, (i, j, k) in enumerate(self.block_indexes):
+        for idx, val in enumerate(self.block_indexes):
+            if num_floors == 3:
+                (i, j, k) = val
+            else:
+                (i, j), k = val, 0
             cell = MineWorkingCell(
                     i, j,
                     self.cube_size, self.cube_size,

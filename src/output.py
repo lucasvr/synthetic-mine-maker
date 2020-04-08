@@ -7,16 +7,15 @@ from collections import OrderedDict
 import os
 
 class PostGIS:
-    def __init__(self):
+    def __init__(self, num_dimensions=3):
         self.schema = "synthetic_mine"
-        self.num_dimensions = 3
+        self.num_dimensions = num_dimensions
 
-    def write(self, level, the_map, num_dimensions, output_dir):
+    def write(self, level, the_map, output_dir):
         """
         Create a set of output files with instructions on how to
         populate a PostGIS database with the generated geometries.
         """
-        self.num_dimensions = num_dimensions
         functions = OrderedDict([
             ("mineworking", self.writeMineWorking),
             ("drillholes", self.writeDrillHoles),

@@ -240,9 +240,12 @@ class MapGen:
     def __createGeologicalShape(self, seed):
         xsize = math.ceil(self.shape_size_generators[0].generate(1)[0])
         ysize = math.ceil(self.shape_size_generators[1].generate(1)[0])
-        zsize = math.ceil(self.shape_size_generators[2].generate(1)[0])
-
-        max_blocks = xsize * ysize * zsize
+        if len(self.shape_size_generators) == 3:
+            zsize = math.ceil(self.shape_size_generators[2].generate(1)[0])
+            max_blocks = xsize * ysize * zsize
+        else:
+            zsize = None
+            max_blocks = xsize * ysize
         shape = GeologicalShape(xsize, ysize, zsize, max_blocks)
         shape.create(seed)
         return shape

@@ -168,8 +168,8 @@ def main():
         num_blocks += sum([len(shp.block_indexes) for shp in floor.shapes])
 
         # Export results
-        postgis_fmt = PostGIS()
-        postgis_fmt.write(i, floor, num_dimensions, options.output_dir)
+        postgis_fmt = PostGIS(num_dimensions)
+        postgis_fmt.write(i, floor, options.output_dir)
 
     print("Blocks: {}".format(num_blocks))
 
