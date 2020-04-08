@@ -9,12 +9,14 @@ import os
 class PostGIS:
     def __init__(self):
         self.schema = "synthetic_mine"
+        self.num_dimensions = 3
 
-    def write(self, level, the_map, output_dir):
+    def write(self, level, the_map, num_dimensions, output_dir):
         """
         Create a set of output files with instructions on how to
         populate a PostGIS database with the generated geometries.
         """
+        self.num_dimensions = num_dimensions
         functions = OrderedDict([
             ("mineworking", self.writeMineWorking),
             ("drillholes", self.writeDrillHoles),
@@ -30,8 +32,9 @@ class PostGIS:
             functions[table](the_map, f"{self.schema}.{table}", path)
 
     def __create(self, path, table):
+        datatype = "GeometryZ" if self.num_dimensions == 3 else "Geometry"
         f = open(path, "w")
-        layout = "(id bigserial, geom geometry(GeometryZ))"
+        layout = f"(id bigserial, geom geometry({datatype}))"
         f.write(f"CREATE SCHEMA IF NOT EXISTS {self.schema};\n")
         f.write(f"CREATE TABLE IF NOT EXISTS {table}{layout};\n")
         f.write(f"INSERT INTO {table}(geom) VALUES\n")
@@ -49,15 +52,16 @@ class PostGIS:
         """
         Write the mine working (level map).
         """
+        datatype = "POLYHEDRALSURFACEZ" if self.num_dimensions == 3 else "POLYHEDRALSURFACE"
         f = self.__create(path, table)
-        f.write("('POLYHEDRALSURFACEZ(\n")
+        f.write(f"('{datatype}(\n")
         for i, cell in enumerate(the_map.corridor):
             terminator = "," if i < len(the_map.corridor)-1 else ""
             f.write("{}{}\n".format(cell.coords(), terminator))
         f.write(")')")
         if the_map.elevator is not None:
             f.write(",\n")
-            f.write("('POLYHEDRALSURFACEZ(\n")
+            f.write(f"('{datatype}(\n")
             f.write("{}\n".format(the_map.elevator.coords()))
             f.write(")')")
         self.__close(table, f)
@@ -78,11 +82,13 @@ class PostGIS:
         This is handy when all drill holes need to be rendered
         together.
         """
+        datatype = "MULTILINESTRINGZ" if self.num_dimensions == 3 else "MULTILINESTRING"
+        pattern = "LINESTRINGZ" if self.num_dimensions == 3 else "LINESTRING"
         f = self.__create(path, table)
-        f.write("('MULTILINESTRINGZ(\n")
+        f.write(f"('{datatype}(\n")
         for i, drill in enumerate(the_map.drills):
             terminator = "," if i < len(the_map.drills)-1 else ""
-            coords = drill.geom().replace("LINESTRINGZ", "")
+            coords = drill.geom().replace(f"{pattern}", "")
             f.write("{}{}\n".format(coords, terminator))
         f.write(")')")
         self.__close(table, f)

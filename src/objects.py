@@ -14,7 +14,7 @@ class DrillHole:
     """
     Drill hole information.
     """
-    def __init__(self, p1, normal, col, row, size_generator, segment_size):
+    def __init__(self, p1, normal, col, row, size_generator, segment_size, num_dimensions):
         # Col,Row used for ASCII printing purposes only
         self.col = col
         self.row = row
@@ -22,19 +22,22 @@ class DrillHole:
         self.line = Line(p1, Point(p1.x, p1.y, p1.z))
         self.normal = normal
         self.segment_size = segment_size
+        self.num_dimensions = num_dimensions
         self.length = -1
 
     def create(self):
         """
         Create the drill hole line object.
         """
+        n = self.num_dimensions
         self.line.p2.x += self.normal.x
         self.line.p2.y += self.normal.y
-        self.line.p2.z += self.normal.z
+        if n == 3:
+            self.line.p2.z += self.normal.z
 
         # Tilt the line a little bit so it's not boring straight
-        x_angle = random.uniform(math.radians(-15), math.radians(15))
-        y_angle = random.uniform(math.radians(-15), math.radians(15))
+        x_angle = random.uniform(math.radians(-15), math.radians(15)) if n == 3 else None
+        y_angle = random.uniform(math.radians(-15), math.radians(15)) if n == 3 else None
         z_angle = random.uniform(math.radians(-15), math.radians(15))
         self.line.rotate(x_angle=x_angle, y_angle=y_angle, z_angle=z_angle)
 
@@ -52,7 +55,7 @@ class DrillHole:
         lines = []
         p1, normal = self.line.p1, self.normal
         for depth in np.arange(0, self.length, self.segment_size):
-            drill = DrillHole(p1, normal, self.col, self.row, None, 0)
+            drill = DrillHole(p1, normal, self.col, self.row, None, 0, self.num_dimensions)
             drill.length = self.segment_size
             if depth + self.segment_size > self.length:
                 drill.length = self.length - depth
@@ -92,6 +95,7 @@ class MineWorkingCell:
         col, row,
         height, width,
         level=0, padding=25,
+        num_dimensions=3,
         cell_type=EMPTY):
 
         self.col = col
@@ -100,6 +104,7 @@ class MineWorkingCell:
         self.width = width
         self.level = level
         self.type = cell_type
+        self.num_dimensions = num_dimensions
         self.neighbors = {
             'n': None, # North
             's': None, # South
@@ -111,10 +116,10 @@ class MineWorkingCell:
         pcenter = self.__centerPoint(padding)
         self.pcenter = pcenter
         self.points = [
-            [pcenter.x - width/2, pcenter.y - width/2, pcenter.z], # p1
-            [pcenter.x - width/2, pcenter.y + width/2, pcenter.z], # p2
-            [pcenter.x + width/2, pcenter.y - width/2, pcenter.z], # p3
-            [pcenter.x + width/2, pcenter.y + width/2, pcenter.z]] # p4
+            [pcenter.x - width/2, pcenter.y - width/2, pcenter.z][:num_dimensions], # p1
+            [pcenter.x - width/2, pcenter.y + width/2, pcenter.z][:num_dimensions], # p2
+            [pcenter.x + width/2, pcenter.y - width/2, pcenter.z][:num_dimensions], # p3
+            [pcenter.x + width/2, pcenter.y + width/2, pcenter.z][:num_dimensions]] # p4
         self.points_ceiling = [
             self.__ceiling(self.points[0]),
             self.__ceiling(self.points[1]),
@@ -127,16 +132,17 @@ class MineWorkingCell:
         """
         x = self.pcenter.x - size/2
         y = self.pcenter.y - size/2
-        z = self.pcenter.z - size/2
+        z = self.pcenter.z - size/2 if self.num_dimensions == 3 else None
+        z_next = z+size if z is not None else None
 
         points = []
         points.append(Point(x,           y,      z))
         points.append(Point(x+size,      y,      z))
-        points.append(Point(x+size,      y, z+size))
-        points.append(Point(     x,      y, z+size))
+        points.append(Point(x+size,      y, z_next))
+        points.append(Point(     x,      y, z_next))
         points.append(Point(     x, y+size,      z))
-        points.append(Point(     x, y+size, z+size))
-        points.append(Point(x+size, y+size, z+size))
+        points.append(Point(     x, y+size, z_next))
+        points.append(Point(x+size, y+size, z_next))
         points.append(Point(x+size, y+size,      z))
 
         order = [
@@ -147,7 +153,7 @@ class MineWorkingCell:
             [0, 1, 7, 4, 0],
             [2, 3, 5, 6, 2]
         ]
-        fmt = "POLYHEDRALSURFACEZ("
+        fmt = "POLYHEDRALSURFACEZ(" if z is not None else "POLYHEDRALSURFACE("
         for i, face in enumerate(order):
             terminator = "," if i < len(order)-1 else ""
             fmt += "(("
@@ -166,11 +172,13 @@ class MineWorkingCell:
         for p in self.points:
             p[0] += origin_point.x
             p[1] += origin_point.y
-            p[2] += origin_point.z
+            if self.num_dimensions == 3:
+                p[2] += origin_point.z
         for p in self.points_ceiling:
             p[0] += origin_point.x
             p[1] += origin_point.y
-            p[2] += origin_point.z
+            if self.num_dimensions == 3:
+                p[2] += origin_point.z
 
     def getWall(self, orientation):
         """
@@ -211,7 +219,7 @@ class MineWorkingCell:
             for point in [triangle.p1, triangle.p2, triangle.p3]:
                 unique_id = point.uniqueId()
                 if not unique_id in vertices_dict:
-                    vertices_dict[unique_id] = [point.x, point.y, point.z]
+                    vertices_dict[unique_id] = [point.x, point.y, point.z][:self.num_dimensions]
 
     def getTriangles(self):
         """
@@ -244,7 +252,7 @@ class MineWorkingCell:
         """
         WKT representation of this geometry
         """
-        fmt = "POLYHEDRALSURFACEZ("
+        fmt = "POLYHEDRALSURFACEZ(" if self.num_dimensions == 3 else "POLYHEDRALSURFACE("
         fmt += self.coords()
         fmt += ")"
         return fmt
@@ -253,7 +261,7 @@ class MineWorkingCell:
         """
         Translate floor to ceiling coordinates (z axis)
         """
-        return [p[0], p[1], p[2]+self.height]
+        return [p[0], p[1], p[2]+self.height][:self.num_dimensions]
 
     def setNeighbors(self, neighbors_coords):
         """
@@ -296,7 +304,7 @@ class MineWorkingCell:
         """
         px = self.col * self.width
         py = self.row * self.width
-        pz = -self.level * self.height * padding
+        pz = -self.level * self.height * padding if self.num_dimensions == 3 else None
         return Point(px, py, pz)
         
     def randomPointOnTheWall(self):

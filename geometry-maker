@@ -91,6 +91,9 @@ def main():
         for fname in glob.glob("{}/*.sql".format(options.output_dir)):
             os.unlink(fname)
 
+    # Get number of output dimensions (i.e., 2D or 3D)
+    num_dimensions = int(cfg.get("General", "dimensions"))
+
     # Create a random number of floors
     num_floors = int(random.uniform(
         int(cfg.get("Floor", "min")),
@@ -122,7 +125,7 @@ def main():
     z_dist_params = [float(v) for v in z_dist_params[1:-1].split(',')]
     z_size_gen = rvg.TheoreticalDistribution(z_dist_name, z_dist_params)
 
-    geo_size_gens = [x_size_gen, y_size_gen, z_size_gen]
+    geo_size_gens = [x_size_gen, y_size_gen, z_size_gen][:num_dimensions]
 
     # Determine how many drill holes to create on each floor
     drillholes = genDistribution(
@@ -158,14 +161,15 @@ def main():
             elevator_coords = elevator,
             num_drills = drillholes[i],
             drill_ival_length = int(cfg.get("DrillHoles", "interval_length")),
-            num_shapes = shapes[i]
+            num_shapes = shapes[i],
+            num_dimensions = num_dimensions
         )
         floor.create(i, num_floors)
         num_blocks += sum([len(shp.block_indexes) for shp in floor.shapes])
 
         # Export results
         postgis_fmt = PostGIS()
-        postgis_fmt.write(i, floor, options.output_dir)
+        postgis_fmt.write(i, floor, num_dimensions, options.output_dir)
 
     print("Blocks: {}".format(num_blocks))
 

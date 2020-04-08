@@ -76,7 +76,8 @@ class MapGen:
                  num_drills=100,
                  cell_height=3, cell_width=4,
                  drill_ival_length=10,
-                 num_shapes=3):
+                 num_shapes=3,
+                 num_dimensions=3):
         self.cols = cols
         self.rows = rows
         self.drill_interval_length = drill_ival_length
@@ -89,6 +90,7 @@ class MapGen:
         self.cell_width = cell_width
         self.size_generator = size_generator
         self.shape_size_generators = shape_size_generators
+        self.num_dimensions = num_dimensions
         # The following are variables we want to share with the caller
         self.corridor = []
         self.drills = []
@@ -209,6 +211,7 @@ class MapGen:
             self.cell_width,
             level=0,
             padding=1,
+            num_dimensions=self.num_dimensions,
             cell_type=MineWorkingCell.CORRIDOR)
 
     def __createDrillholes(self):
@@ -229,7 +232,8 @@ class MapGen:
                         cell.col,
                         cell.row,
                         self.size_generator,
-                        self.drill_interval_length)
+                        self.drill_interval_length,
+                        self.num_dimensions)
                     drillhole.create()
                     self.drills.append(drillhole)
 

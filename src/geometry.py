@@ -13,15 +13,17 @@ class Point:
         self.z = z
 
     def __str__(self):
-        return f"x={self.x} y={self.y} z={self.z}"
+        if self.z is not None:
+            return f"x={self.x} y={self.y} z={self.z}"
+        return f"x={self.x} y={self.y}"
 
     def __repr__(self):
-        return self.__str()
+        return self.__str__()
 
     def __truediv__(self, other):
         x = self.x / other
         y = self.y / other
-        z = self.z / other
+        z = self.z / other if self.z is not None else None
         return Point(x, y, z)
 
     def __floordiv__(self, other):
@@ -30,7 +32,7 @@ class Point:
     def __mul__(self, other):
         x = self.x * other
         y = self.y * other
-        z = self.z * other
+        z = self.z * other if self.z is not None else None
         return Point(x, y, z)
 
     def __rmul__(self, other):
@@ -39,29 +41,36 @@ class Point:
     def __add__(self, other):
         x = self.x + other.x
         y = self.y + other.y
-        z = self.z + other.z
+        z = self.z + other.z if self.z is not None else None
         return Point(x, y, z)
 
     def __sub__(self, other):
         x = self.x - other.x
         y = self.y - other.y
-        z = self.z - other.z
+        z = self.z - other.z if self.z is not None else None
         return Point(x, y, z)
 
     def uniqueId(self):
         p1, p2, p3 = 73856093, 19349663, 83492791
-        return int(p1*self.x) ^ int(p2*self.y) ^ int(p3*self.z)
+        if self.z is not None:
+            return int(p1*self.x) ^ int(p2*self.y) ^ int(p3*self.z)
+        return int(p1*self.x) ^ int(p2*self.y)
 
     def translate(self, origin):
         self.x += origin.x
         self.y += origin.y
-        self.z += origin.z
+        if self.z is not None:
+            self.z += origin.z
 
     def coords(self):
-        return "{} {} {}".format(self.x, self.y, self.z)
+        if self.z is not None:
+            return "{} {} {}".format(self.x, self.y, self.z)
+        return "{} {}".format(self.x, self.y)
 
     def wkt(self):
-        return "POINTZ ({})".format(self.coords())
+        if self.z is not None:
+            return "POINTZ ({})".format(self.coords())
+        return "POINT ({})".format(self.coords())
 
 
 class Line:
@@ -76,7 +85,8 @@ class Line:
             cur_length = 1.0
         self.p2.x = self.p1.x + (x / cur_length) * new_length
         self.p2.y = self.p1.y + (y / cur_length) * new_length
-        self.p2.z = self.p1.z + (z / cur_length) * new_length
+        if self.p1.z is not None:
+            self.p2.z = self.p1.z + (z / cur_length) * new_length
 
     def rotate(self, x_angle=None, y_angle=None, z_angle=None):
         """
@@ -96,17 +106,25 @@ class Line:
             self.p2.y = self.p1.y + (x*sin(z_angle) - y*cos(z_angle))
 
     def __translatedCoords(self):
-        return (
-            self.p2.x - self.p1.x,
-            self.p2.y - self.p1.y,
-            self.p2.z - self.p1.z
-        )
-
+        if self.p1.z is not None:
+            return (
+                self.p2.x - self.p1.x,
+                self.p2.y - self.p1.y,
+                self.p2.z - self.p1.z
+            )
+        else:
+            return (
+                self.p2.x - self.p1.x,
+                self.p2.y - self.p1.y,
+                0
+            )
     def coords(self):
         return "{}, {}".format(self.p1.coords(), self.p2.coords())
 
     def wkt(self):
-        return "LINESTRINGZ ({})".format(self.coords())
+        if self.p1.z is not None:
+            return "LINESTRINGZ ({})".format(self.coords())
+        return "LINESTRING ({})".format(self.coords())
 
 
 class Triangle:
@@ -132,7 +150,7 @@ class Triangle:
             pivot2 = Point(
                 pivot.x + normal.x,
                 pivot.y + normal.y,
-                pivot.z + normal.z)
+                pivot.z + normal.z if pivot.z is not None else None)
             line = Line(pivot, pivot2)
             line.setLength(random.uniform(0.0, 0.25))
             pivot = line.p2
