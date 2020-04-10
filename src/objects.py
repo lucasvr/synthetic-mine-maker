@@ -93,9 +93,8 @@ class MineWorkingCell:
 
     def __init__(self,
         col, row,
-        height, width,
+        height, width, num_dimensions,
         level=0, padding=25,
-        num_dimensions=3,
         cell_type=EMPTY):
 
         self.col = col
@@ -115,11 +114,18 @@ class MineWorkingCell:
         }
         pcenter = self.__centerPoint(padding)
         self.pcenter = pcenter
-        self.points = [
-            [pcenter.x - width/2, pcenter.y - width/2, pcenter.z][:num_dimensions], # p1
-            [pcenter.x - width/2, pcenter.y + width/2, pcenter.z][:num_dimensions], # p2
-            [pcenter.x + width/2, pcenter.y - width/2, pcenter.z][:num_dimensions], # p3
-            [pcenter.x + width/2, pcenter.y + width/2, pcenter.z][:num_dimensions]] # p4
+        if num_dimensions == 3:
+            self.points = [
+                [pcenter.x - width/2, pcenter.y - width/2, pcenter.z][:num_dimensions], # p1
+                [pcenter.x - width/2, pcenter.y + width/2, pcenter.z][:num_dimensions], # p2
+                [pcenter.x + width/2, pcenter.y - width/2, pcenter.z][:num_dimensions], # p3
+                [pcenter.x + width/2, pcenter.y + width/2, pcenter.z][:num_dimensions]] # p4
+        else:
+            self.points = [
+                [pcenter.x - width/2, pcenter.y - width/2][:num_dimensions], # p1
+                [pcenter.x - width/2, pcenter.y + width/2][:num_dimensions], # p2
+                [pcenter.x + width/2, pcenter.y - width/2][:num_dimensions], # p3
+                [pcenter.x + width/2, pcenter.y + width/2][:num_dimensions]] # p4
         self.points_ceiling = [
             self.__ceiling(self.points[0]),
             self.__ceiling(self.points[1]),
@@ -219,7 +225,7 @@ class MineWorkingCell:
             for point in [triangle.p1, triangle.p2, triangle.p3]:
                 unique_id = point.uniqueId()
                 if not unique_id in vertices_dict:
-                    vertices_dict[unique_id] = [point.x, point.y, point.z][:self.num_dimensions]
+                    vertices_dict[unique_id] = [point.x, point.y, point.z][:self.num_dimensions] if self.num_dimensions == 3 else [point.x, point.y]
 
     def getTriangles(self):
         """
@@ -261,7 +267,10 @@ class MineWorkingCell:
         """
         Translate floor to ceiling coordinates (z axis)
         """
-        return [p[0], p[1], p[2]+self.height][:self.num_dimensions]
+        if self.num_dimensions == 3:
+            return [p[0], p[1], p[2]+self.height][:self.num_dimensions]
+        else:
+            return [p[0], p[1]][:self.num_dimensions]
 
     def setNeighbors(self, neighbors_coords):
         """
@@ -377,6 +386,19 @@ class GeologicalShape:
                 valid_neighbors.append((ni, nj, nk))
         return valid_neighbors
 
+    def possibleNeighbors2(self, i, j):
+        s = self.cube_size
+        neighbors = [
+            (i, j-s),
+            (i-s, j), (i+s, j), (i, j+s),
+            (i, j), (i, j)]
+        valid_neighbors = []
+        for (ni, nj) in neighbors:
+            if ni >= 0 and ni < self.map.shape[0] and \
+                nj >= 0 and nj < self.map.shape[1]:
+                valid_neighbors.append((ni, nj))
+        return valid_neighbors
+
     def create(self, seed):
         """
         Create the geological model shape and the block models
@@ -384,7 +406,10 @@ class GeologicalShape:
         # Adjust the seed point so that the shape grows above and
         # below this level's corridor cells
         num_floors = self.zsize if self.zsize != None else 0
-        self.seed = Point(seed.x, seed.y, seed.z + (num_floors/2.0) * self.cube_size)
+        if seed.z is not None:
+            self.seed = Point(seed.x, seed.y, seed.z + (num_floors/2.0) * self.cube_size)
+        else:
+            self.seed = Point(seed.x, seed.y)
 
         # Create the shape as a collection of regular boxes
         num_floors = 3 if self.zsize is not None else 2
@@ -425,21 +450,22 @@ class GeologicalShape:
         vertices_dict = OrderedDict()
 
         # TODO: add proper support for 2D
-        #for i, j in self.block_indexes:
-        #    neighbors = []
-        #    for (ni, nj, _) in self.possibleNeighbors(i, j, None):
-        #        if self.map[ni, nj]:
-        #            neighbors.append((ni, nj))
-        #    if len(neighbors) > 0:
-        #        cell = MineWorkingCell(
-        #            i, j,
-        #            self.cube_size, self.cube_size,
-        #            level=0,
-        #            padding=1,
-        #            cell_type=MineWorkingCell.BLOCK)
-        #        cell.translate(self.seed)
-        #        cell.setNeighbors(neighbors)
-        #        cell.getVerticeData(vertices_dict)
+        for i, j in self.block_indexes:
+            neighbors = []
+            for (ni, nj) in self.possibleNeighbors2(i, j):
+                if self.map[ni, nj]:
+                    neighbors.append((ni, nj))
+            if len(neighbors) > 0:
+                cell = MineWorkingCell(
+                    i, j,
+                    self.cube_size, self.cube_size,
+                    2,
+                    level=0,
+                    padding=1,
+                    cell_type=MineWorkingCell.BLOCK)
+                cell.translate(self.seed)
+                cell.setNeighbors(neighbors)
+                cell.getVerticeData(vertices_dict)
 
         # Return the list of vertices that compose this shape
         return list(vertices_dict.values())
@@ -485,6 +511,7 @@ class GeologicalShape:
                 cell = MineWorkingCell(
                     i, j,
                     self.cube_size, self.cube_size,
+                    3,
                     level=k,
                     padding=1,
                     cell_type=MineWorkingCell.BLOCK)
@@ -507,10 +534,16 @@ class GeologicalShape:
             for index in self.delaunay.simplices:
                 fmt += "(("
                 for p in self.hull.points[index][0:3]:
-                    fmt += "{} {} {},".format(p[0], p[1], p[2])
+                    if num_floors == 3:
+                        fmt += "{} {} {},".format(p[0], p[1], p[2])
+                    else:
+                        fmt += "{} {},".format(p[0], p[1])
                 # Repeat the first point
                 p = self.hull.points[index][0]
-                fmt += "{} {} {}".format(p[0], p[1], p[2])
+                if num_floors == 3:
+                    fmt += "{} {} {}".format(p[0], p[1], p[2])
+                else:
+                    fmt += "{} {}".format(p[0], p[1])
                 fmt += ")),\n"
         return fmt[:-2] + "\n)"
 
@@ -528,6 +561,7 @@ class GeologicalShape:
             cell = MineWorkingCell(
                     i, j,
                     self.cube_size, self.cube_size,
+                    num_floors,
                     level=k,
                     padding=1,
                     cell_type=MineWorkingCell.BLOCK)

@@ -7,7 +7,7 @@ import random
 from math import sqrt, sin, cos
 
 class Point:
-    def __init__(self, x, y, z):
+    def __init__(self, x, y, z = None):
         self.x = x
         self.y = y
         self.z = z
@@ -76,11 +76,11 @@ class Line:
     def __init__(self, p1, p2):
         self.p1 = p1
         self.p2 = p2
-        self.is_2d = self.p1.z == None
+        self.is_2d = not self.p1.z
 
     def setLength(self, new_length):
         x, y, z = self.__translatedCoords()
-        cur_length = sqrt(x**2 + y**2 + z**2)
+        cur_length = sqrt(x**2 + y**2 + z**2) if not self.is_2d else sqrt(x**2 + y**2)
         if cur_length == 0.0:
             cur_length = 1.0
         self.p2.x = self.p1.x + (x / cur_length) * new_length
@@ -116,7 +116,7 @@ class Line:
             return (
                 self.p2.x - self.p1.x,
                 self.p2.y - self.p1.y,
-                0
+                None
             )
     def coords(self):
         return "{}, {}".format(self.p1.coords(), self.p2.coords())
@@ -179,7 +179,7 @@ class Triangle:
             else:
                 # TODO
                 nx = (v.x * w.y) - (v.y * w.x)
-                self.normal = Point(nx, ny, None)
+                self.normal = Point(nx, 0, 0)
         return self.normal
 
     def getRandomPoint(self):
@@ -194,10 +194,13 @@ class Triangle:
         py = (1.0 - sqrt(a)) * self.p1.y + \
             (sqrt(a) * (1.0 - b)) * self.p2.y + \
             (sqrt(a) * b) * self.p3.y
-        pz = (1.0 - sqrt(a)) * self.p1.z + \
-            (sqrt(a) * (1.0 - b)) * self.p2.z + \
-            (sqrt(a) * b) * self.p3.z
-        return Point(px, py, pz)
+        if self.p1.z is not None:
+            pz = (1.0 - sqrt(a)) * self.p1.z + \
+                (sqrt(a) * (1.0 - b)) * self.p2.z + \
+                (sqrt(a) * b) * self.p3.z
+            return Point(px, py, pz)
+        else:
+            return Point(px, py, None)
 
     def coords(self):
         return "{}, {}, {}, {}".format(

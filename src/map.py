@@ -69,15 +69,14 @@ class Graph:
 
 
 class MapGen:
-    def __init__(self, size_generator, shape_size_generators, 
-                 cols=100,
+    def __init__(self, size_generator, shape_size_generators, num_dimensions, 
+                 cols,
                  rows=45, min_seeds=10, max_seeds=20,
                  elevator_coords=(0, 0),
                  num_drills=100,
                  cell_height=3, cell_width=4,
                  drill_ival_length=10,
-                 num_shapes=3,
-                 num_dimensions=3):
+                 num_shapes=3):
         self.cols = cols
         self.rows = rows
         self.drill_interval_length = drill_ival_length
@@ -166,7 +165,7 @@ class MapGen:
             for x in range(self.num_rooms-1)]
         for col, row in endpoints:
             self.map[col,row] = MineWorkingCell(
-                col, row, self.cell_height, self.cell_width,
+                col, row, self.cell_height, self.cell_width, self.num_dimensions,
                 level, cell_type=MineWorkingCell.ENDPOINT)
 
         # Connect endpoints using straight lines, populating the
@@ -209,9 +208,9 @@ class MapGen:
             col, row,
             self.cell_height * (num_levels-1) * padding,
             self.cell_width,
+            self.num_dimensions,
             level=0,
             padding=1,
-            num_dimensions=self.num_dimensions,
             cell_type=MineWorkingCell.CORRIDOR)
 
     def __createDrillholes(self):
@@ -294,7 +293,7 @@ class MapGen:
             cell = self.map[col, from_row]
             if cell == None:
                 cell = self.map[col, from_row] = MineWorkingCell(
-                    col, from_row, self.cell_height, self.cell_width, level)
+                    col, from_row, self.cell_height, self.cell_width, self.num_dimensions, level)
             cell.type = value
             self.corridor.append(cell)
 
@@ -303,6 +302,6 @@ class MapGen:
             cell = self.map[to_col, row]
             if cell == None:
                 cell = self.map[to_col, row] = MineWorkingCell(
-                    to_col, row, self.cell_height, self.cell_width, level)
+                    to_col, row, self.cell_height, self.cell_width, self.num_dimensions, level)
             cell.type = value
             self.corridor.append(cell)
