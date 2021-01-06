@@ -23,7 +23,8 @@ generated according to an uniform distribution and user-defined thresholds.
 # Output
 
 The output is comprised of a set of PostgreSQL dump files that can be
-ingested into an existing database using the standard `psql` tool. When
-loaded into a third-party 3D renderer, a typical scene looks like this:
+ingested into an existing database using the standard `psql` tool. It is
+also possible to export the geometries into plain WKT files with `--output-type=wkt`.
+When loaded into a third-party 3D renderer, a typical scene looks like this:
 
 ![](images/synthetic_mine.png)
