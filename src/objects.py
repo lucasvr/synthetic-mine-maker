@@ -430,11 +430,11 @@ class GeologicalShape:
         # Return the list of vertices that compose this shape
         return list(vertices_dict.values())
 
-    def geom(self):
+    def geom(self, postgis_output=True):
         """
         WKT representation of this geometry.
         """
-        fmt = "POLYHEDRALSURFACEZ(\n"
+        fmt = "POLYHEDRALSURFACEZ(" + (postgis_output * "\n")
         for index in self.delaunay.simplices:
             fmt += "(("
             for p in self.hull.points[index][0:3]:
@@ -442,10 +442,12 @@ class GeologicalShape:
             # Repeat the first point
             p = self.hull.points[index][0]
             fmt += "{} {} {}".format(p[0], p[1], p[2])
-            fmt += ")),\n"
-        return fmt[:-2] + "\n)"
+            fmt += "))," + (postgis_output * "\n")
+        if postgis_output:
+            return fmt[:-2] + "\n)"
+        return fmt[:-1] + ")"
 
-    def blockmodelGeom(self):
+    def blockmodelGeom(self, postgis_output=True):
         """
         List of WKT strings representing all blockmodels within this geometry.
         """
@@ -459,7 +461,10 @@ class GeologicalShape:
                     cell_type=MineWorkingCell.BLOCK)
             cell.translate(self.seed)
             terminator = "," if idx < len(self.block_indexes)-1 else ""
-            fmt += "('"
-            fmt += cell.asBlock(self.cube_size)
-            fmt += "'){}\n".format(terminator)
+            if postgis_output:
+                fmt += "('"
+                fmt += cell.asBlock(self.cube_size)
+                fmt += "'){}\n".format(terminator)
+            else:
+                fmt += "{}\n".format(cell.asBlock(self.cube_size))
         return fmt

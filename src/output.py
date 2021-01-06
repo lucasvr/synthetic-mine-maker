@@ -119,3 +119,79 @@ class PostGIS:
             terminator = "," if i < len(the_map.shapes)-1 else ""
             f.write("{}{}\n".format(shape.blockmodelGeom(), terminator))
         self.__close(table, f)
+
+
+class WKT:
+    def write(self, level, the_map, output_dir):
+        """
+        Create a set of output files in plain WKT format.
+        """
+        functions = OrderedDict([
+            ("mineworking", self.writeMineWorking),
+            ("drillholes", self.writeDrillHoles),
+            ("multiline_drillholes", self.writeMultiLineDrillHoles),
+            ("segments", self.writeSegments),
+            ("geological_shapes", self.writeGeologicalShapes),
+            ("blockmodel", self.writeBlockModel)
+        ])
+        for table in functions.keys():
+            print("Exporting results: level {}, table {}".format(level, table))
+            fname = "{}.level_{:02d}.wkt".format(table, level)
+            with open(os.path.join(output_dir, fname), "w") as f:
+                functions[table](the_map, f)
+
+    def writeMineWorking(self, the_map, f):
+        """
+        Write the mine working (level map).
+        """
+        f.write("POLYHEDRALSURFACEZ(")
+        for i, cell in enumerate(the_map.corridor):
+            terminator = "," if i < len(the_map.corridor)-1 else ""
+            f.write("{}{}".format(cell.coords(), terminator))
+        f.write(")\n")
+        if the_map.elevator is not None:
+            f.write("POLYHEDRALSURFACEZ(")
+            f.write("{}".format(the_map.elevator.coords()))
+            f.write(")\n")
+
+    def writeDrillHoles(self, the_map, f):
+        """
+        Write drill holes as a series of LineString objects.
+        """
+        for i, drill in enumerate(the_map.drills):
+            f.write("{}\n".format(drill.geom()))
+
+    def writeMultiLineDrillHoles(self, the_map, f):
+        """
+        Write drill holes as a single large MultiLineString.
+        This is handy when all drill holes need to be rendered
+        together.
+        """
+        f.write("MULTILINESTRINGZ(")
+        for i, drill in enumerate(the_map.drills):
+            terminator = "," if i < len(the_map.drills)-1 else ""
+            coords = drill.geom().replace("LINESTRINGZ", "")
+            f.write("{}{}".format(coords, terminator))
+        f.write(")\n")
+
+    def writeSegments(self, the_map, f):
+        """
+        Write drill hole segments.
+        """
+        for i, drill in enumerate(the_map.drills):
+            for j, segment in enumerate(drill.segments()):
+                f.write("{}\n".format(segment.geom()))
+
+    def writeGeologicalShapes(self, the_map, f):
+        """
+        Write geological shapes.
+        """
+        for i, shape in enumerate(the_map.shapes):
+            f.write("{}\n".format(shape.geom(postgis_output=False)))
+
+    def writeBlockModel(self, the_map, f):
+        """
+        Write block model entities.
+        """
+        for i, shape in enumerate(the_map.shapes):
+            f.write("{}\n".format(shape.blockmodelGeom(postgis_output=False)))

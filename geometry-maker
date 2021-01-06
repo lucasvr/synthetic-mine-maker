@@ -9,25 +9,29 @@ import glob
 import getopt
 import random
 from src.map import MapGen
-from src.output import PostGIS
+from src.output import PostGIS, WKT
 import src.randomvariategen as rvg
 from configparser import ConfigParser
 
 
 class OptionParser:
     def __init__(self):
-        self.shortopts = "hc:o:"
-        self.longopts = ["config-file=", "help", "output-dir="]
+        self.shortopts = "hc:o:t:"
+        self.longopts = ["config-file=", "help", "output-dir=", "output-type="]
         self.config_file = "config.ini"
         self.output_dir = "output"
+        self.output_type = "wkt"
+        self.output_type_options = ["wkt", "postgis"]
 
     def usage(self, retval):
+
         print("Syntax: {} <options>\n\n"\
               "Available options are:\n"\
               "  -h, --help               This help\n"\
               "  -c, --config-file=FILE   Config file (default: {})\n"\
               "  -o, --output-dir=DIR     Output directory (default: {})\n"
-              .format(sys.argv[0], self.config_file, self.output_dir))
+              "  -t, --output-type=TYPE   Output type: 'wkt' or 'postis' (default: {})\n"
+              .format(sys.argv[0], self.config_file, self.output_dir, self.output_type))
         sys.exit(retval)
 
     def parse(self):
@@ -43,10 +47,15 @@ class OptionParser:
             if opt in [ "-c", "--config-file" ]:
                 print("Reading settings from {}".format(arg))
                 self.config_file = arg
-            elif opt in [ "-h", "--help" ]:
+            elif opt in ["-h", "--help"]:
                 self.usage(0)
-            elif opt in [ "-o", "--output" ]:
+            elif opt in ["-o", "--output-dir"]:
                 self.output_dir = arg
+            elif opt in ["-t", "--output-type"]:
+                if not arg in self.output_type_options:
+                    print("Error: invalid output-type '{}'".format(arg))
+                    self.usage(1)
+                self.output_type = arg
             else:
                 print("invalid option %s" %opt)
                 self.usage(1)
@@ -89,6 +98,8 @@ def main():
         os.makedirs(options.output_dir)
     else:
         for fname in glob.glob("{}/*.sql".format(options.output_dir)):
+            os.unlink(fname)
+        for fname in glob.glob("{}/*.wkt".format(options.output_dir)):
             os.unlink(fname)
 
     # Create a random number of floors
@@ -164,8 +175,12 @@ def main():
         num_blocks += sum([len(shp.block_indexes) for shp in floor.shapes])
 
         # Export results
-        postgis_fmt = PostGIS()
-        postgis_fmt.write(i, floor, options.output_dir)
+        if options.output_type == "postgis":
+            postgis_fmt = PostGIS()
+            postgis_fmt.write(i, floor, options.output_dir)
+        else:
+            wkt_fmt = WKT()
+            wkt_fmt.write(i, floor, options.output_dir)
 
     print("Blocks: {}".format(num_blocks))
 
