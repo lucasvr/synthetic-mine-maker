@@ -20,6 +20,7 @@ class PostGIS:
             ("drillholes", self.writeDrillHoles),
             ("multiline_drillholes", self.writeMultiLineDrillHoles),
             ("segments", self.writeSegments),
+            ("points", self.writePoints),
             ("geological_shapes", self.writeGeologicalShapes),
             ("blockmodel", self.writeBlockModel)
         ])
@@ -100,6 +101,17 @@ class PostGIS:
                 f.write("('{}'){}\n".format(segment.geom(), terminator))
         self.__close(table, f)
 
+    def writePoints(self, the_map, table, path):
+        """
+        Write drill holes as POINTZ objects.
+        """
+        f = self.__create(path, table)
+        for i, drill in enumerate(the_map.drills):
+            terminator = "," if i < len(the_map.drills)-1 else ""
+            p1, p2 = drill.line.p1, drill.line.p2
+            f.write("('{}'),('{}'){}\n".format(p1.wkt(), p2.wkt(), terminator))
+        self.__close(table, f)
+
     def writeGeologicalShapes(self, the_map, table, path):
         """
         Write geological shapes.
@@ -131,11 +143,12 @@ class WKT:
             ("drillholes", self.writeDrillHoles),
             ("multiline_drillholes", self.writeMultiLineDrillHoles),
             ("segments", self.writeSegments),
+            ("points", self.writePoints),
             ("geological_shapes", self.writeGeologicalShapes),
             ("blockmodel", self.writeBlockModel)
         ])
         for table in functions.keys():
-            print("Exporting results: level {}, table {}".format(level, table))
+            print("Exporting results: level {}, {}".format(level, table))
             fname = "{}.level_{:02d}.wkt".format(table, level)
             with open(os.path.join(output_dir, fname), "w") as f:
                 functions[table](the_map, f)
@@ -181,6 +194,14 @@ class WKT:
         for i, drill in enumerate(the_map.drills):
             for j, segment in enumerate(drill.segments()):
                 f.write("{}\n".format(segment.geom()))
+
+    def writePoints(self, the_map, f):
+        """
+        Write drill holes as POINTZ objects.
+        """
+        for i, drill in enumerate(the_map.drills):
+            p1, p2 = drill.line.p1, drill.line.p2
+            f.write("{}\n{}\n".format(p1.wkt(), p2.wkt()))
 
     def writeGeologicalShapes(self, the_map, f):
         """
