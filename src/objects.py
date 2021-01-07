@@ -3,7 +3,8 @@
 
 # Mine-related objects.
 
-from scipy.spatial import ConvexHull, Delaunay
+from scipy.spatial import ConvexHull
+from pyhull.delaunay import DelaunayTri
 from collections import OrderedDict
 from src.geometry import *
 import numpy as np
@@ -377,7 +378,7 @@ class GeologicalShape:
 
         # Compute the convex hull of the shape
         self.hull = ConvexHull(vertices)
-        self.delaunay = Delaunay(self.hull.points)
+        self.delaunay = DelaunayTri(self.hull.points)
 
     def __createGeometry(self):
         # Initialize the grid
@@ -435,7 +436,7 @@ class GeologicalShape:
         WKT representation of this geometry.
         """
         fmt = "POLYHEDRALSURFACEZ(" + (postgis_output * "\n")
-        for index in self.delaunay.simplices:
+        for index in np.asarray(self.delaunay.vertices):
             fmt += "(("
             for p in self.hull.points[index][0:3]:
                 fmt += "{} {} {},".format(p[0], p[1], p[2])
