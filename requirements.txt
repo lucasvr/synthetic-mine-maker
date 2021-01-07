@@ -1,3 +1,4 @@
 astroML
 numpy
 scipy
+pyhull
